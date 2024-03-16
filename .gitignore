@@ -25,3 +25,7 @@ dist-ssr
 
 app.drawio
 .env
+/uploads
+setup.md
+/node_modules
+yarn.lock

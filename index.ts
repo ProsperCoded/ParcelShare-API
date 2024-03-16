@@ -1,14 +1,16 @@
+// Environments
+// import
+debug_main(JWT_TOKEN, SALT_TOKEN);
 import express from "express";
 import mongoose from "mongoose";
-//
-import dotenv from "dotenv";
-dotenv.config();
-import bodyParser from "body-parser";
 
+import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
+
+// Debuggers
 import { debug_database, debug_main } from "./utils/debuggers.ts";
 // Connection Utilis
-const MONGODB_URI = process.env.MONGODB_URI;
+
 const DATABASE = "ParcelShare";
 const DATABASE_URI = `${MONGODB_URI}${DATABASE}`;
 debug_database(DATABASE_URI);
@@ -25,17 +27,37 @@ const PORT = process.env.PORT || 3000;
 
 // Middlewares
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded());
-// app.use(cookieParser())
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cookieParser());
+// Set Headers
+app.use("*", (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  // res.setHeader("Access-Control-Expose-Headers", "x-auth-token");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS, PUT, PATCH, DELETE"
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Max-Age", 3600);
+
+  // Handle preflight requests (OPTIONS method)
+  if (req.method === "OPTIONS") {
+    // Respond successfully to preflight requests
+    debug_main("running preflight");
+    res.status(200);
+    return res.end();
+  }
+  next();
+});
 
 // Routes
 app.get("/", (req, res) => {
-  const foo = process.env.a;
-  res.send(foo);
+  res.send("Welcome to Parcel Share");
 });
 
 // Adding routers
-import UserRoute from "./routes/User.ts";
+import UserRoute from "./routes/Users.ts/User.ts";
+import { JWT_TOKEN, MONGODB_URI, SALT_TOKEN } from "./utils/config.ts";
 app.use("/users", UserRoute);
 
 // Application Listener
