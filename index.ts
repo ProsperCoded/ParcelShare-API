@@ -76,18 +76,18 @@ import { MONGODB_URI } from "./utils/config.ts";
 import debug from "debug";
 app.use("/users", UserRoute);
 
-// Application Listener
-app.listen(PORT, () => {
-  console.log(`listening on PORT http://localhost:${PORT}`);
-});
-// const server = https.createServer(
-//   {
-//     key: fs.readFileSync(`./cert/localhost-key.pem`, "utf8"),
-//     cert: fs.readFileSync(`./cert/localhost.pem`, "utf8"),
-//   },
-//   app
-// );
-// server.on("connection", () => {
-//   console.log("Server is running on https://localhost:3000");
+// // Application Listener
+// app.listen(PORT, () => {
+//   console.log(`listening on PORT http://localhost:${PORT}`);
 // });
-// await server.listen(3000);
+const server = https.createServer(
+  {
+    key: fs.readFileSync(`./cert/localhost-key.pem`, "utf8"),
+    cert: fs.readFileSync(`./cert/localhost.pem`, "utf8"),
+  },
+  app
+);
+server.on("connection", () => {
+  console.log("Server is running on https://localhost:3000");
+});
+await server.listen(3000);

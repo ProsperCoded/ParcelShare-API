@@ -119,7 +119,7 @@ app.post("/login", validate(userLoginSchema), async (req, res) => {
     );
 
     if (authenticated) {
-      const jwtToken = jwt.sign({ id: user.id }, JWT_TOKEN);
+      const jwtToken = jwt.sign({ id: user.id.toString() }, JWT_TOKEN);
       res.cookie("jwtToken", jwtToken, {
         maxAge: JWT_MAX_AGE,
         // httpOnly: false,
