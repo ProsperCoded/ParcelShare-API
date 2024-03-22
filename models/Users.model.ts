@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 // import { File_DirectorySchema } from "./file.model.ts";
 import { UserModelType } from "../types";
-
+import { SALT } from "../utils/config.ts";
+import bcrypt from "bcrypt";
 const UserSchema = new mongoose.Schema({
   // first
   fullName: {
@@ -35,14 +36,16 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  // files: [
-  //   {
-  //     type: mongoose.Schema.Types.ObjectId,
-  //     ref: "File",
-  //     required: true,
-  //   },
-  // ],
+  friends: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    default: [],
+  },
+  friendRequests: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    default: [],
+  },
+  username: String,
+
   rootDirectory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "File",

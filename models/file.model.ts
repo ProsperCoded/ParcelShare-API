@@ -18,9 +18,12 @@ import mongoose from "mongoose";
 
 const FileSchema = new mongoose.Schema({
   name: String,
-  path: String,
+  path: { type: String },
   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  lastModified: String,
+  lastModified: {
+    type: Date,
+    required: true,
+  },
 
   _type: {
     type: String,
