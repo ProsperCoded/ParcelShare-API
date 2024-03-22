@@ -9,7 +9,7 @@ import _ from "lodash";
 import { validate } from "../../utils/utils.ts";
 import {
   JWT_MAX_AGE,
-  JWT_TOKEN,
+  JWT_PRIVATE_KEY,
   SALT,
   SALT_TOKEN,
 } from "../../utils/config.ts";
@@ -22,7 +22,7 @@ import {
   uploadFileSchema,
   userLoginSchema,
   userRegisterSchema,
-} from "./UserJoiSchemas.ts";
+} from "./UsersJoiSchemas.ts";
 
 const app = express.Router();
 
@@ -64,7 +64,7 @@ app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
     await user.save();
     await rootDirectory.save();
 
-    const jwtToken = jwt.sign({ id: user.id }, JWT_TOKEN);
+    const jwtToken = jwt.sign({ id: user.id }, JWT_PRIVATE_KEY);
     res.cookie("jwtToken", jwtToken, { maxAge: JWT_MAX_AGE });
     res.status(200).json({ message: "Registered Successfully" });
   } catch (err: any) {
@@ -81,7 +81,7 @@ function authenticateUser(req: any, res: any, next: () => void) {
   const jwtToken = req.cookies.jwtToken as string;
   try {
     if (!jwtToken) throw new Error("User Token Isn't present");
-    let userData = jwt.verify(jwtToken, JWT_TOKEN) as { id: string };
+    let userData = jwt.verify(jwtToken, JWT_PRIVATE_KEY) as { id: string };
     req.id = userData.id;
   } catch (err) {
     res.status(401).send("Unauthenticated");
@@ -95,7 +95,7 @@ app.get("/auto-login", async (req, res, next) => {
   const jwtToken = req.cookies.jwtToken as string;
   try {
     if (!jwtToken) throw new Error("User Token Isn't present");
-    let userData = jwt.verify(jwtToken, JWT_TOKEN) as { id: string };
+    let userData = jwt.verify(jwtToken, JWT_PRIVATE_KEY) as { id: string };
     const user = await UserModel.findById(userData.id)
       .populate({ path: "friends" })
       .exec();
@@ -119,13 +119,12 @@ app.post("/login", validate(userLoginSchema), async (req, res) => {
     );
 
     if (authenticated) {
-      const jwtToken = jwt.sign({ id: user.id.toString() }, JWT_TOKEN);
+      const jwtToken = jwt.sign({ id: user.id }, JWT_PRIVATE_KEY);
       res.cookie("jwtToken", jwtToken, {
         maxAge: JWT_MAX_AGE,
-        // httpOnly: false,
+        httpOnly: false,
         secure: true,
         sameSite: "none",
-        domain: "https://localhost:3000",
       });
       res.json({
         message: "Login Successfully",

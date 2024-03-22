@@ -34,6 +34,7 @@ app.use(cookieParser());
 app.use("*", (req, res, next) => {
   const allowedOrigins = [
     "http://localhost:5173",
+    "https://localhost:5000",
     "https://parcelshare.netlify.app",
   ];
   const origin = req.headers.origin as string;
@@ -52,6 +53,7 @@ app.use("*", (req, res, next) => {
     "Access-Control-Allow-Headers",
     "X-Requested-With,content-type, Origin"
   );
+  res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type");
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Max-Age", 3600);
 
@@ -71,12 +73,12 @@ app.get("/", (req, res) => {
 });
 
 // Adding routers
-import UserRoute from "./routes/Users.ts/User.ts";
+import UserRoute from "./routes/Users.ts/Users.ts";
 import { MONGODB_URI } from "./utils/config.ts";
 import debug from "debug";
 app.use("/users", UserRoute);
 
-// // Application Listener
+// Application Listener
 // app.listen(PORT, () => {
 //   console.log(`listening on PORT http://localhost:${PORT}`);
 // });
