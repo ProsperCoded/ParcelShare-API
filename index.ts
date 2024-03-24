@@ -29,6 +29,17 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// For Express protocol setting
+app.set("trust proxy", true);
+app.use("*", (req, res, next) => {
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+  const host = req.get("host") as string;
+  const serverOrigin = `${protocol}://${host}`;
+  res.setHeader("x-origin", serverOrigin);
+  res.setHeader("x-host", host);
+  next();
+});
 // Set Headers
 
 app.use("*", (req, res, next) => {
@@ -44,19 +55,20 @@ app.use("*", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   // res.setHeader("Access-Control-Allow-Origin", "*");
-  // res.setHeader("Access-Control-Expose-Headers", "x-auth-token");
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET, POST, OPTIONS, PUT, PATCH, DELETE"
   );
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "X-Requested-With,content-type, Origin"
+    "X-Requested-With,content-type, Origin, x-user-token"
   );
-  res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type");
+  res.setHeader(
+    "Access-Control-Expose-Headers",
+    "Content-Type, x-origin, x-host"
+  );
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Max-Age", 3600);
-
   // Handle preflight requests (OPTIONS method)
   if (req.method === "OPTIONS") {
     // Respond successfully to preflight requests

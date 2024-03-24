@@ -30,6 +30,9 @@ const app = express.Router();
 const dataToSend = [
   "email",
   "rootDirectory",
+  "fullName",
+  "username",
+  "registrationDate",
   "friends",
   "shareTo",
   "shareFrom",
@@ -37,7 +40,7 @@ const dataToSend = [
 // Routes
 
 app.get("/", (req, res) => {
-  res.send("Welcome");
+  res.send("Welcome User");
 });
 function storeUserJwt(req: Request, res: Response, next: () => void) {}
 app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
@@ -66,7 +69,11 @@ app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
 
     const jwtToken = jwt.sign({ id: user.id }, JWT_PRIVATE_KEY);
     res.cookie("jwtToken", jwtToken, { maxAge: JWT_MAX_AGE });
-    res.status(200).json({ message: "Registered Successfully" });
+    res.status(200).json({
+      message: "Registered Successfully",
+      jwtToken,
+      data: _.pick(user, dataToSend),
+    });
   } catch (err: any) {
     let message = "An Error occurred in saving user";
 
@@ -78,7 +85,8 @@ app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
   }
 });
 function authenticateUser(req: any, res: any, next: () => void) {
-  const jwtToken = req.cookies.jwtToken as string;
+  const jwtToken = (req.cookies.jwtToken ||
+    req.headers["x-user-token"]) as string;
   try {
     if (!jwtToken) throw new Error("User Token Isn't present");
     let userData = jwt.verify(jwtToken, JWT_PRIVATE_KEY) as { id: string };
@@ -90,18 +98,15 @@ function authenticateUser(req: any, res: any, next: () => void) {
   next();
 }
 
-app.get("/auto-login", async (req, res, next) => {
-  console.log("cookies ", req.cookies, req.headers.cookie);
-  const jwtToken = req.cookies.jwtToken as string;
+app.get("/auto-login", authenticateUser, async (req: any, res, next) => {
   try {
-    if (!jwtToken) throw new Error("User Token Isn't present");
-    let userData = jwt.verify(jwtToken, JWT_PRIVATE_KEY) as { id: string };
-    const user = await UserModel.findById(userData.id)
+    const id: string = req.id;
+    const user = await UserModel.findById(id)
       .populate({ path: "friends" })
       .exec();
     if (!user) throw new Error("Invalid User Id");
     res
-      .status(201)
+      .status(200)
       .json({ message: "Successful", data: _.pick(user, dataToSend) });
   } catch (err: any) {
     res.status(401).send("Unauthenticated");
@@ -128,6 +133,7 @@ app.post("/login", validate(userLoginSchema), async (req, res) => {
       });
       res.json({
         message: "Login Successfully",
+        jwtToken: jwtToken,
         data: _.pick(user, dataToSend),
       });
       return;
@@ -135,6 +141,7 @@ app.post("/login", validate(userLoginSchema), async (req, res) => {
   }
   res.status(403).send("Invalid Email or Password (Unauthorized)");
 });
+// app.post('/logout', (req, res)=>{})
 async function populateFileTree(fileId: String) {
   try {
     const file: any = await FileModel.findById(fileId).populate("content");
@@ -357,7 +364,6 @@ app.put(
     }
   }
 );
-// app.put('/profile-password')
-// app.put("add-friend")
+
 const UserRoute = app;
 export default UserRoute;
