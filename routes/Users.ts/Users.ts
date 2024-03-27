@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import upload from "../../upload.ts";
 import _ from "lodash";
 import { validate } from "../../utils/utils.ts";
+import mongoose from "mongoose";
 import {
   JWT_MAX_AGE,
   JWT_PRIVATE_KEY,
@@ -18,10 +19,11 @@ import {
   deleteFileSchema,
   renameFileSchema,
   updateProfileSchema,
-  uploadDirectorySchema,
+  createDirectorySchema,
   uploadFileSchema,
   userLoginSchema,
   userRegisterSchema,
+  deleteFilesSchema,
 } from "./UsersJoiSchemas.ts";
 
 const app = express.Router();
@@ -174,16 +176,12 @@ app.get("/files", authenticateUser, async (req: any, res) => {
 });
 
 app.post(
-  "/create-directory",
+  "/files/create-dir",
   authenticateUser,
-  validate(uploadDirectorySchema),
+  validate(createDirectorySchema),
   async (req: any, res) => {
     const id = req.id as string;
-    const directoryName = req.body.name as string;
-    // const creationDate = req.body.creationDate;
-    // const user = await UserModel.findById(id);
-    // if (!user)
-    //   return res.status(401).json({ message: "Cant find user account" });
+    const directoryName = req.body.dirName as string;
 
     const rootDirectoryId: string = req.body.rootDirectoryId;
     const rootDirectory = await FileModel.findById(rootDirectoryId);
@@ -225,17 +223,16 @@ app.post(
   }
 );
 app.post(
-  "/upload",
+  "/files/upload",
   authenticateUser,
   upload.single("file"),
   validate(uploadFileSchema),
   async (req: any, res) => {
     const id = req.id as string;
-    // const creationDate = req.body.creationDate;
-    // const user = await UserModel.findById(id);
-    // if (!user) return res.status(401).send("Cant find user account");
 
     const rootDirectoryId: string = req.body.rootDirectoryId;
+    console.log(rootDirectoryId);
+
     const rootDirectory = await FileModel.findById(rootDirectoryId);
     if (!rootDirectory) return res.status(401).send("Directory doesn't exist");
     if (rootDirectory._type === "file")
@@ -253,7 +250,6 @@ app.post(
       owner: req.id,
       lastModified: new Date(),
     });
-    // user.files = [{ data: File.id, sharedTo: [] }];
     try {
       await File.save();
       let folderContent = rootDirectory.content;
@@ -261,25 +257,22 @@ app.post(
       rootDirectory.content = folderContent;
       await rootDirectory.save();
     } catch (err: any) {
-      debug_database("An Error Uploading file");
+      debug_database("An Error Uploading file", err);
       return res.status(500).json({
         message: "Error occurred in uploading file",
-        error: Object.values(err.errors)[0],
+        error: err,
       });
     }
     res.status(201).json({ message: "File Created Successfully" });
   }
 );
 app.delete(
-  "/files",
+  "/file",
   authenticateUser,
   validate(deleteFileSchema),
   async (req: any, res) => {
     const id = req.id;
     const fileId = req.body.fileId;
-
-    // const user = await UserModel.findById(id);
-    // if (!user) return res.status(401).send("Cant find user account");
 
     const rootDirectoryId: string = req.body.rootDirectoryId;
     const rootDirectory = await FileModel.findById(rootDirectoryId);
@@ -315,7 +308,57 @@ app.delete(
         error: Object.values(err.errors)[0],
       });
     }
-    res.status(204).json({ message: "File Deleted Successfully" });
+    res.status(200).json({ message: "File Deleted Successfully" });
+  }
+);
+app.delete(
+  "/files",
+  authenticateUser,
+  validate(deleteFilesSchema),
+  async (req: any, res) => {
+    const id = req.id;
+    const fileIds = req.body.fileIds as string[];
+
+    const rootDirectoryId: string = req.body.rootDirectoryId;
+    const rootDirectory = await FileModel.findById(rootDirectoryId);
+    if (!rootDirectory) return res.status(401).send("Directory doesn't exist");
+    if (rootDirectory._type === "file")
+      return res.status(400).json({
+        message: "Invalid Request, Root Directory must be a valid Directory",
+      });
+    console.log("Root Directory and file", rootDirectory.content, fileIds);
+    if (id !== rootDirectory.owner.toString())
+      return res
+        .status(403)
+        .json({ message: "You are unAuthorized to Edit this Directory" });
+    // mongoose.Types.ObjectId.is
+    const allChildren = rootDirectory.content.filter((_fileId) => {
+      let fid_string = _fileId.toString();
+      if (fileIds.includes(fid_string)) return fid_string;
+    });
+    console.log(allChildren);
+    if (allChildren.length !== fileIds.length) {
+      return res.status(400).json({
+        message:
+          "Invalid Request, Root directory must be a direct parent of all files",
+      });
+    }
+    try {
+      const query = { _id: { $in: fileIds } };
+      await FileModel.deleteMany(query);
+      rootDirectory.content = rootDirectory.content.filter((_fileId) => {
+        return !fileIds.includes(_fileId.toString());
+      });
+      // _.pull(rootDirectory.content, file.id);
+      await rootDirectory.save();
+    } catch (err: any) {
+      debug_database("An Error Deleting file");
+      return res.status(500).json({
+        message: "Error occurred in deleting file",
+        error: Object.values(err.errors)[0],
+      });
+    }
+    res.status(201).json({ message: "File Deleted Successfully" });
   }
 );
 app.put(
