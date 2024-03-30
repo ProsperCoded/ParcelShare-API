@@ -24,6 +24,7 @@ import {
   userLoginSchema,
   userRegisterSchema,
   deleteFilesSchema,
+  moveFileSchema,
 } from "./UsersJoiSchemas.ts";
 
 const app = express.Router();
@@ -229,9 +230,8 @@ app.post(
   validate(uploadFileSchema),
   async (req: any, res) => {
     const id = req.id as string;
-
+    debug_user("file properties ", req.file);
     const rootDirectoryId: string = req.body.rootDirectoryId;
-    console.log(rootDirectoryId);
 
     const rootDirectory = await FileModel.findById(rootDirectoryId);
     if (!rootDirectory) return res.status(401).send("Directory doesn't exist");
@@ -242,6 +242,7 @@ app.post(
     if (id !== rootDirectory.owner.toString()) {
       return res.status(403).send("You are unAuthorized to Edit this Folder");
     }
+    let fileSizeKilobyte = ((req.file.size as number) / 1024).toFixed(2);
     const File = new FileModel({
       name: req.file.originalname,
       mimetype: req.file.mimetype,
@@ -249,6 +250,7 @@ app.post(
       _type: "file",
       owner: req.id,
       lastModified: new Date(),
+      fileSizeKilobyte,
     });
     try {
       await File.save();
@@ -332,12 +334,13 @@ app.delete(
         .status(403)
         .json({ message: "You are unAuthorized to Edit this Directory" });
     // mongoose.Types.ObjectId.is
-    const allChildren = rootDirectory.content.filter((_fileId) => {
+
+    const matchingChildren = rootDirectory.content.filter((_fileId) => {
       let fid_string = _fileId.toString();
       if (fileIds.includes(fid_string)) return fid_string;
     });
-    console.log(allChildren);
-    if (allChildren.length !== fileIds.length) {
+    console.log(matchingChildren);
+    if (matchingChildren.length !== fileIds.length) {
       return res.status(400).json({
         message:
           "Invalid Request, Root directory must be a direct parent of all files",
@@ -355,7 +358,7 @@ app.delete(
       debug_database("An Error Deleting file");
       return res.status(500).json({
         message: "Error occurred in deleting file",
-        error: Object.values(err.errors)[0],
+        error: err,
       });
     }
     res.status(201).json({ message: "File Deleted Successfully" });
@@ -407,6 +410,67 @@ app.put(
     }
   }
 );
+app.put(
+  "/files/move",
+  authenticateUser,
+  validate(moveFileSchema),
+  async (req: any, res) => {
+    const id = req.id;
+    const fileIds: string[] = req.body.fileIds;
+    const rootDirectoryId: string = req.body.rootDirectoryId;
+    const newRootDirectoryId: string = req.body.newRootDirectoryId;
 
+    const rootDirectory = await FileModel.findById(rootDirectoryId);
+    const newRootDirectory = await FileModel.findById(newRootDirectoryId);
+    if (!rootDirectory || !newRootDirectory)
+      return res.status(401).send("Directory doesn't exist");
+    if (rootDirectory._type === "file" || newRootDirectory._type === "file")
+      return res.status(400).json({
+        message: "Invalid Request, Directory must be a valid Directory",
+      });
+
+    if (
+      id !== rootDirectory.owner.toString() ||
+      id !== newRootDirectory.owner.toString()
+    )
+      return res
+        .status(403)
+        .json({ message: "You are unAuthorized to Edit this Directory" });
+    const notMatchingChildren = rootDirectory.content.filter((_fileId) => {
+      let fid_string = _fileId.toString();
+      if (!fileIds.includes(fid_string)) return fid_string;
+    });
+    console.log({
+      content: rootDirectory.content,
+      notMatchingChildren,
+      fileIds,
+    });
+    if (
+      rootDirectory.content.length - notMatchingChildren.length !==
+      fileIds.length
+    ) {
+      return res.status(400).json({
+        message:
+          "Invalid Request, Root directory must be a direct parent of all files",
+      });
+    }
+    try {
+      rootDirectory.content = notMatchingChildren;
+      await rootDirectory.save();
+      newRootDirectory.content = [
+        ...newRootDirectory.content,
+        ...fileIds.map((id) => new mongoose.Types.ObjectId(id)),
+      ];
+      await newRootDirectory.save();
+    } catch (error) {
+      debug_database("An Error Deleting file");
+      return res.status(500).json({
+        message: "Error occurred in moving file/files",
+        error,
+      });
+    }
+    res.status(201).json({ message: "File Moved Successfully" });
+  }
+);
 const UserRoute = app;
 export default UserRoute;

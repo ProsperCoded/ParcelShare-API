@@ -1,21 +1,6 @@
 import { string } from "joi";
 import mongoose from "mongoose";
 
-// export const FileSchema = new mongoose.Schema({
-//   // fileType: {
-//   //   type: String,
-//   //   required: true,
-//   //   enum: ["file", "directory"],
-//   // },
-//   name: String,
-
-//   lastModified: String,
-//   // For Only Files
-//   fileSizeKilobyte: Number,
-//   // For Only directories
-//   // content: [],
-// });
-
 const FileSchema = new mongoose.Schema({
   name: String,
   path: { type: String },
