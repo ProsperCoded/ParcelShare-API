@@ -75,3 +75,8 @@ export const moveFileSchema = Joi.object({
   rootDirectoryId: JoiObjectIdDirectory.required(),
   newRootDirectoryId: JoiObjectIdDirectory.required(),
 });
+export const updateFavoriteSchema = Joi.object({
+  // rootDirectoryId: Joi.string().required(),
+  fileIds: Joi.array().items(JoiObjectIdFile.required()),
+  favorite: Joi.boolean().required(),
+});

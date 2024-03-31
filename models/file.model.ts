@@ -18,7 +18,10 @@ const FileSchema = new mongoose.Schema({
   // Only available in files
   fileSizeKilobyte: Number,
   mimeType: String,
-
+  favorite: {
+    type: Boolean,
+    default: false,
+  },
   // If it's a directory, store its content (files or directories)
   content: [{ type: mongoose.Schema.Types.ObjectId, ref: "File" }],
 });

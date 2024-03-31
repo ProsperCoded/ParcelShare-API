@@ -25,6 +25,7 @@ import {
   userRegisterSchema,
   deleteFilesSchema,
   moveFileSchema,
+  updateFavoriteSchema,
 } from "./UsersJoiSchemas.ts";
 
 const app = express.Router();
@@ -142,7 +143,7 @@ app.post("/login", validate(userLoginSchema), async (req, res) => {
       return;
     }
   }
-  res.status(403).send("Invalid Email or Password (Unauthorized)");
+  res.status(403).send({ message: "Invalid Email or Password (Unauthorized)" });
 });
 // app.post('/logout', (req, res)=>{})
 async function populateFileTree(fileId: String) {
@@ -470,6 +471,35 @@ app.put(
       });
     }
     res.status(201).json({ message: "File Moved Successfully" });
+  }
+);
+app.put(
+  "/files/update-favorite",
+  authenticateUser,
+  validate(updateFavoriteSchema),
+  async (req: any, res) => {
+    const id: string = req.id;
+    const favorite: boolean = req.body.favorite;
+    const fileIds: string[] = req.body.fileIds;
+    try {
+      for (let fileId of fileIds) {
+        let file = await FileModel.findById(fileId);
+        if (!file)
+          return res.status(401).json({ message: "File doesn't exist" });
+        if (id !== file.owner.toString())
+          return res
+            .status(403)
+            .json({ message: "You are unAuthorized to Edit this Directory" });
+        file.favorite = favorite;
+        await file.save();
+      }
+    } catch (error) {
+      res.status(500).json({
+        message: "A Server Error occurred in updating favorites",
+        error,
+      });
+    }
+    res.status(201).json({ message: "Favorite Updated Successfully" });
   }
 );
 const UserRoute = app;
