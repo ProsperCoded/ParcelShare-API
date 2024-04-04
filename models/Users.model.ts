@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 // import { File_DirectorySchema } from "./file.model.ts";
-import { UserModelType } from "../types";
 import { SALT } from "../utils/config.ts";
 import bcrypt from "bcrypt";
 const UserSchema = new mongoose.Schema({
@@ -45,7 +44,7 @@ const UserSchema = new mongoose.Schema({
     default: [],
   },
   username: String,
-
+  organization: String,
   rootDirectory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "File",
@@ -53,5 +52,5 @@ const UserSchema = new mongoose.Schema({
   },
 });
 
-const UserModel = mongoose.model<UserModelType>("User", UserSchema);
+const UserModel = mongoose.model("User", UserSchema);
 export default UserModel;

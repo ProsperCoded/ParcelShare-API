@@ -22,6 +22,7 @@ const JoiObjectIdDirectory = Joi.string()
 export const userRegisterSchema = Joi.object({
   fullName: Joi.string()
     .required()
+    .max(30)
     .custom((value: String, helper) => {
       if (!value.includes("-")) {
         return helper.message({
@@ -31,9 +32,9 @@ export const userRegisterSchema = Joi.object({
       return true;
     }),
   email: Joi.string().email().required(),
-  password: Joi.string().min(5).required(),
-  username: Joi.string().min(3),
-  // registrationDate: Joi.date().required(),
+  password: Joi.string().max(20).required(),
+  username: Joi.string().max(20).min(0),
+  organization: Joi.string().max(20).min(0),
 });
 export const userLoginSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -60,7 +61,8 @@ export const renameFileSchema = Joi.object({
   name: Joi.string().required(),
 });
 export const updateProfileSchema = Joi.object({
-  username: Joi.string().min(3),
+  email: Joi.string().email(),
+  username: Joi.string().min(3).max(20),
   fullName: Joi.string().custom((value: String, helper) => {
     if (!value.includes("-")) {
       return helper.message({
@@ -69,6 +71,7 @@ export const updateProfileSchema = Joi.object({
     }
     return true;
   }),
+  organization: Joi.string().max(20).min(0),
 });
 export const moveFileSchema = Joi.object({
   fileIds: Joi.array().items(JoiObjectIdFile.required()),

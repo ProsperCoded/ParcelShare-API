@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 // import cookieParser from "cookie-parser";
 import upload from "../../upload.ts";
 import _ from "lodash";
-import { validate } from "../../utils/utils.ts";
+import { deleteFile, validate } from "../../utils/utils.ts";
 import mongoose from "mongoose";
 import {
   JWT_MAX_AGE,
@@ -37,25 +37,53 @@ const dataToSend = [
   "fullName",
   "username",
   "registrationDate",
+  "organization",
   "friends",
   "shareTo",
   "shareFrom",
 ];
+
+async function populateFileTree(fileId: String) {
+  const file: any = await FileModel.findById(fileId).populate("content");
+  if (!file) {
+    console.error("File not found");
+    return null;
+  }
+
+  // Recursively populate children if this file is a directory
+  if (file._type === "directory" && file.content.length > 0) {
+    for (let i = 0; i < file.content.length; i++) {
+      file.content[i] = await populateFileTree(file.content[i].id.toString());
+    }
+  }
+  return file;
+}
+
+async function modifyEveryFile(fileId: string, modifier: (file: any) => any) {
+  let file: any = await FileModel.findById(fileId);
+  if (file._type === "file") {
+    file = modifier(file);
+    // file.save();
+  } else if (file._type === "directory" && file.content.length > 0) {
+    for (let i = 0; i < file.content.length; i++) {
+      await modifyEveryFile(file.content[i], modifier);
+    }
+  }
+}
+
 // Routes
 
 app.get("/", (req, res) => {
   res.send("Welcome User");
 });
-function storeUserJwt(req: Request, res: Response, next: () => void) {}
+
 app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
   const hashedPass = await bcrypt.hash(req.body.password, SALT);
   debug_user("body:", req.body);
+  let userInfo = _.pickBy(req.body, (value) => value && value !== null);
   const user: any = new UserModel({
-    email: req.body.email,
+    ...userInfo,
     password: hashedPass,
-
-    fullName: req.body.fullName,
-    // rootDirectory: {},
     registrationDate: new Date(),
   });
   const rootDirectory = new FileModel({
@@ -63,7 +91,6 @@ app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
 
     owner: user.id,
     _type: "directory",
-    content: [],
     lastModified: new Date(),
   });
   user.rootDirectory = rootDirectory.id;
@@ -146,32 +173,18 @@ app.post("/login", validate(userLoginSchema), async (req, res) => {
   res.status(403).send({ message: "Invalid Email or Password (Unauthorized)" });
 });
 // app.post('/logout', (req, res)=>{})
-async function populateFileTree(fileId: String) {
-  try {
-    const file: any = await FileModel.findById(fileId).populate("content");
-    if (!file) {
-      console.error("File not found");
-      return null;
-    }
-
-    // Recursively populate children if this file is a directory
-    if (file._type === "directory" && file.content.length > 0) {
-      for (let i = 0; i < file.content.length; i++) {
-        file.content[i] = await populateFileTree(file.content[i].id.toString());
-      }
-    }
-    return file;
-  } catch (error) {
-    console.error("Error populating file tree:", error);
-    return null;
-  }
-}
 
 app.get("/files", authenticateUser, async (req: any, res) => {
   const id = req.id as string;
   const user = await UserModel.findById(id);
+  let fileTree;
   if (!user) return res.status(401).send("Cant find user account");
-  const fileTree = await populateFileTree(user.rootDirectory);
+  try {
+    fileTree = await populateFileTree(user.rootDirectory.toString());
+  } catch (error) {
+    console.error("Error populating file tree:", error);
+    return null;
+  }
   res.status(200).json({
     files: fileTree.content,
   });
@@ -348,15 +361,21 @@ app.delete(
       });
     }
     try {
-      const query = { _id: { $in: fileIds } };
-      await FileModel.deleteMany(query);
+      // Delete from filesystem
+      for (let fileId of fileIds) {
+        modifyEveryFile(fileId, async (f) => {
+          await FileModel.findByIdAndDelete(f._id);
+          if (f._type === "file") {
+            deleteFile(f.path);
+          }
+        });
+      }
       rootDirectory.content = rootDirectory.content.filter((_fileId) => {
         return !fileIds.includes(_fileId.toString());
       });
-      // _.pull(rootDirectory.content, file.id);
       await rootDirectory.save();
     } catch (err: any) {
-      debug_database("An Error Deleting file");
+      debug_database("An Error Deleting file", err);
       return res.status(500).json({
         message: "Error occurred in deleting file",
         error: err,
@@ -403,10 +422,10 @@ app.put(
         .status(201)
         .json({ message: "Profile Has Being Updated", data: { user } });
     } catch (err: any) {
-      debug_database("An Error Updating profile");
+      debug_database("An Error Updating profile", err);
       return res.status(500).json({
         message: "Error occurred in updating user profile",
-        error: Object.values(err.errors)[0],
+        error: JSON.stringify(err),
       });
     }
   }
