@@ -1,24 +1,8 @@
 import Joi from "joi";
 import mongoose from "mongoose";
+import { JoiObjectId } from "../../utils/utils.ts";
 // Pre forms
-const JoiObjectIdFile = Joi.string()
-  .length(24)
-  .custom((value, helpers) => {
-    if (!mongoose.Types.ObjectId.isValid(value)) {
-      return helpers.message({ custom: "FileId must be of type ObjectID" });
-    }
-    return value;
-  }, "Object Id Validation");
-const JoiObjectIdDirectory = Joi.string()
-  .length(24)
-  .custom((value, helpers) => {
-    if (!mongoose.Types.ObjectId.isValid(value)) {
-      return helpers.message({
-        custom: "rootDirectoryId must be of type ObjectID",
-      });
-    }
-    return value;
-  }, "Object Id Validation");
+
 export const userRegisterSchema = Joi.object({
   fullName: Joi.string()
     .required()
@@ -34,30 +18,40 @@ export const userRegisterSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().max(20).required(),
   username: Joi.string().max(20).min(0),
-  organization: Joi.string().max(20).min(0),
+  organizations: Joi.array().items(
+    JoiObjectId("organizations items must be of type ObjectID").required()
+  ),
 });
 export const userLoginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(5).required(),
 });
 export const uploadFileSchema = Joi.object({
-  rootDirectoryId: JoiObjectIdDirectory.required(),
+  rootDirectoryId: JoiObjectId(
+    "rootDirectoryId must be of type ObjectID"
+  ).required(),
 });
 export const createDirectorySchema = Joi.object({
   rootDirectoryId: Joi.string().required(),
   dirName: Joi.string().required(),
 });
 export const deleteFileSchema = Joi.object({
-  rootDirectoryId: JoiObjectIdDirectory.required(),
-  fileId: JoiObjectIdFile.required(),
+  rootDirectoryId: JoiObjectId(
+    "rootDirectoryId must be of type ObjectID"
+  ).required(),
+  fileId: JoiObjectId("fileId must be of type ObjectID").required(),
 });
 export const deleteFilesSchema = Joi.object({
-  rootDirectoryId: JoiObjectIdDirectory.required(),
-  fileIds: Joi.array().items(JoiObjectIdFile.required()),
+  rootDirectoryId: JoiObjectId(
+    "rootDirectoryId must be of type ObjectID"
+  ).required(),
+  fileIds: Joi.array().items(
+    JoiObjectId("fileId must be of type ObjectID").required()
+  ),
 });
 export const renameFileSchema = Joi.object({
   // rootDirectoryId: Joi.string().required(),
-  fileId: JoiObjectIdFile.required(),
+  fileId: JoiObjectId("fileId must be of type ObjectID").required(),
   name: Joi.string().required(),
 });
 export const updateProfileSchema = Joi.object({
@@ -74,12 +68,19 @@ export const updateProfileSchema = Joi.object({
   organization: Joi.string().max(20).min(0),
 });
 export const moveFileSchema = Joi.object({
-  fileIds: Joi.array().items(JoiObjectIdFile.required()),
-  rootDirectoryId: JoiObjectIdDirectory.required(),
-  newRootDirectoryId: JoiObjectIdDirectory.required(),
+  fileIds: Joi.array().items(
+    JoiObjectId("fileId must be of type ObjectID").required()
+  ),
+  rootDirectoryId: JoiObjectId(
+    "rootDirectoryId must be of type ObjectID"
+  ).required(),
+  newRootDirectoryId: JoiObjectId(
+    "rootDirectoryId must be of type ObjectID"
+  ).required(),
 });
 export const updateFavoriteSchema = Joi.object({
-  // rootDirectoryId: Joi.string().required(),
-  fileIds: Joi.array().items(JoiObjectIdFile.required()),
+  fileIds: Joi.array().items(
+    JoiObjectId("fileId must be of type ObjectID").required()
+  ),
   favorite: Joi.boolean().required(),
 });

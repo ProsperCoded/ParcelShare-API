@@ -86,9 +86,11 @@ app.get("/", (req, res) => {
 
 // Adding routers
 import UserRoute from "./routes/Users.ts/Users.ts";
+import OrganizationRouter from "./routes/Organizations/Organization.ts";
 import { MONGODB_URI } from "./utils/config.ts";
 import debug from "debug";
 app.use("/users", UserRoute);
+app.use("/organizations", OrganizationRouter);
 
 // Application Listener
 // app.listen(PORT, () => {

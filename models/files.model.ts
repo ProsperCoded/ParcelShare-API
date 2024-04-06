@@ -1,4 +1,3 @@
-import { string } from "joi";
 import mongoose from "mongoose";
 
 const FileSchema = new mongoose.Schema({
@@ -9,7 +8,7 @@ const FileSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
-
+  organizations: [],
   _type: {
     type: String,
     enum: ["file", "directory"],

@@ -44,7 +44,18 @@ const UserSchema = new mongoose.Schema({
     default: [],
   },
   username: String,
-  organization: String,
+  organizations: {
+    type: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Organizations",
+        required: true,
+      },
+    ],
+    default: [],
+    required: true,
+  },
+
   rootDirectory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "File",

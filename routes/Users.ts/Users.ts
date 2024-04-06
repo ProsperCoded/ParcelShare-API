@@ -8,13 +8,8 @@ import upload from "../../upload.ts";
 import _ from "lodash";
 import { deleteFile, validate } from "../../utils/utils.ts";
 import mongoose from "mongoose";
-import {
-  JWT_MAX_AGE,
-  JWT_PRIVATE_KEY,
-  SALT,
-  SALT_TOKEN,
-} from "../../utils/config.ts";
-import FileModel from "../../models/file.model.ts";
+import { JWT_MAX_AGE, JWT_PRIVATE_KEY, SALT } from "../../utils/config.ts";
+import FileModel from "../../models/files.model.ts";
 import {
   deleteFileSchema,
   renameFileSchema,
@@ -115,7 +110,7 @@ app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
     });
   }
 });
-function authenticateUser(req: any, res: any, next: () => void) {
+export function authenticateUser(req: any, res: any, next: () => void) {
   const jwtToken = (req.cookies.jwtToken ||
     req.headers["x-user-token"]) as string;
   try {
@@ -135,7 +130,7 @@ app.get("/auto-login", authenticateUser, async (req: any, res, next) => {
     const user = await UserModel.findById(id)
       .populate({ path: "friends" })
       .exec();
-    if (!user) throw new Error("Invalid User Id");
+    if (!user) res.status(401).send("Invalid User Id");
     res
       .status(200)
       .json({ message: "Successful", data: _.pick(user, dataToSend) });
@@ -172,13 +167,12 @@ app.post("/login", validate(userLoginSchema), async (req, res) => {
   }
   res.status(403).send({ message: "Invalid Email or Password (Unauthorized)" });
 });
-// app.post('/logout', (req, res)=>{})
 
 app.get("/files", authenticateUser, async (req: any, res) => {
   const id = req.id as string;
   const user = await UserModel.findById(id);
-  let fileTree;
   if (!user) return res.status(401).send("Cant find user account");
+  let fileTree;
   try {
     fileTree = await populateFileTree(user.rootDirectory.toString());
   } catch (error) {
@@ -315,7 +309,6 @@ app.delete(
       rootDirectory.content = rootDirectory.content.filter((_fileId) => {
         return _fileId.toString() !== file.id;
       });
-      // _.pull(rootDirectory.content, file.id);
       await rootDirectory.save();
     } catch (err: any) {
       debug_database("An Error Deleting file");
@@ -361,7 +354,6 @@ app.delete(
       });
     }
     try {
-      // Delete from filesystem
       for (let fileId of fileIds) {
         modifyEveryFile(fileId, async (f) => {
           await FileModel.findByIdAndDelete(f._id);
