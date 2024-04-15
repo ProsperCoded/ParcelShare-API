@@ -26,34 +26,6 @@ export const userLoginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(5).required(),
 });
-export const uploadFileSchema = Joi.object({
-  rootDirectoryId: JoiObjectId(
-    "rootDirectoryId must be of type ObjectID"
-  ).required(),
-});
-export const createDirectorySchema = Joi.object({
-  rootDirectoryId: Joi.string().required(),
-  dirName: Joi.string().required(),
-});
-export const deleteFileSchema = Joi.object({
-  rootDirectoryId: JoiObjectId(
-    "rootDirectoryId must be of type ObjectID"
-  ).required(),
-  fileId: JoiObjectId("fileId must be of type ObjectID").required(),
-});
-export const deleteFilesSchema = Joi.object({
-  rootDirectoryId: JoiObjectId(
-    "rootDirectoryId must be of type ObjectID"
-  ).required(),
-  fileIds: Joi.array().items(
-    JoiObjectId("fileId must be of type ObjectID").required()
-  ),
-});
-export const renameFileSchema = Joi.object({
-  // rootDirectoryId: Joi.string().required(),
-  fileId: JoiObjectId("fileId must be of type ObjectID").required(),
-  name: Joi.string().required(),
-});
 export const updateProfileSchema = Joi.object({
   email: Joi.string().email(),
   username: Joi.string().min(3).max(20),
@@ -67,20 +39,9 @@ export const updateProfileSchema = Joi.object({
   }),
   organization: Joi.string().max(20).min(0),
 });
-export const moveFileSchema = Joi.object({
-  fileIds: Joi.array().items(
-    JoiObjectId("fileId must be of type ObjectID").required()
-  ),
-  rootDirectoryId: JoiObjectId(
-    "rootDirectoryId must be of type ObjectID"
-  ).required(),
-  newRootDirectoryId: JoiObjectId(
-    "rootDirectoryId must be of type ObjectID"
-  ).required(),
+export const connectUserSchema = Joi.object({
+  connectId: JoiObjectId("Must be a valid userId"),
 });
-export const updateFavoriteSchema = Joi.object({
-  fileIds: Joi.array().items(
-    JoiObjectId("fileId must be of type ObjectID").required()
-  ),
-  favorite: Joi.boolean().required(),
+export const deleteUserSchema = Joi.object({
+  password: Joi.string().min(5).required(),
 });

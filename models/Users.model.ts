@@ -35,12 +35,18 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  friends: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  connections: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Users" }],
     default: [],
   },
-  friendRequests: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  // Request sent to you
+  connectionsRequest: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Users" }],
+    default: [],
+  },
+  // Request you sent
+  connectRequests: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Users" }],
     default: [],
   },
   username: String,
@@ -63,5 +69,5 @@ const UserSchema = new mongoose.Schema({
   },
 });
 
-const UserModel = mongoose.model("User", UserSchema);
+const UserModel = mongoose.model("Users", UserSchema);
 export default UserModel;

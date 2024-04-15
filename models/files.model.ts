@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const FileSchema = new mongoose.Schema({
   name: String,
   path: { type: String },
-  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: "Users", required: true },
   lastModified: {
     type: Date,
     required: true,
@@ -22,8 +22,8 @@ const FileSchema = new mongoose.Schema({
     default: false,
   },
   // If it's a directory, store its content (files or directories)
-  content: [{ type: mongoose.Schema.Types.ObjectId, ref: "File" }],
+  content: [{ type: mongoose.Schema.Types.ObjectId, ref: "Files" }],
 });
 
-const FileModel = mongoose.model("File", FileSchema);
+const FileModel = mongoose.model("Files", FileSchema);
 export default FileModel;

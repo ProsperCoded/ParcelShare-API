@@ -85,11 +85,13 @@ app.get("/", (req, res) => {
 });
 
 // Adding routers
-import UserRoute from "./routes/Users.ts/Users.ts";
+import UserRouter from "./routes/Users.ts/Users.ts";
+import FilesRouter from "./routes/Files/Files.ts";
 import OrganizationRouter from "./routes/Organizations/Organization.ts";
 import { MONGODB_URI } from "./utils/config.ts";
 import debug from "debug";
-app.use("/users", UserRoute);
+app.use("/users", UserRouter);
+app.use("/files", FilesRouter);
 app.use("/organizations", OrganizationRouter);
 
 // Application Listener
@@ -106,4 +108,4 @@ const server = https.createServer(
 server.on("connection", () => {
   console.log("Server is running on https://localhost:3000");
 });
-await server.listen(3000);
+server.listen(3000);

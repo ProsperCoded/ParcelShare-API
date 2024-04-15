@@ -2,26 +2,77 @@ import { debug_database, debug_organization } from "../../utils/debuggers.ts";
 import express from "express";
 import UserModel from "../../models/users.model.ts";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import upload from "../../upload.ts";
 import _ from "lodash";
 import mongoose from "mongoose";
-import { JWT_MAX_AGE, SALT } from "../../utils/config.ts";
+import { SALT } from "../../utils/config.ts";
 import OrganizationModel from "../../models/organizations.model.ts";
-import { authenticateUser } from "../Users.ts/Users.ts";
+import { authenticateUser, userSendOnly } from "../Users.ts/Users.ts";
 import { validate } from "../../utils/utils.ts";
 import {
   validateCreateOrganization,
   validateDeleteOrganization,
   validateJoinOrganization,
+  validateSearchOrganization,
 } from "./OrganizationSchemas.ts";
-
+const organizationSendOnly = ["members", "name", "categories", "restriction"];
 const app = express.Router();
-app.get("/", authenticateUser, async (req, res) => {
+app.get("/", async (req, res) => {
   let publicOrganizations = await OrganizationModel.find({
     restriction: "public",
-  }).select({ name: 1, members: 1 });
+  })
+    .select({ name: 1, members: 1 })
+    .populate({ path: "members.user" })
+    .sort({ members: 1 });
   res.json(publicOrganizations);
+});
+app.post(
+  "/search",
+
+  validate(validateSearchOrganization),
+  async (req, res) => {
+    let regex = new RegExp(req.body.query, "i");
+    let publicSearchResults = await OrganizationModel.find({
+      restriction: "public",
+      name: { $regex: regex },
+    }).select({ name: 1, members: 1 });
+    publicSearchResults.sort((a, b) => {
+      return b.members.length - a.members.length;
+    });
+    return res.json(publicSearchResults);
+  }
+);
+app.get("/populate", authenticateUser, async (req: any, res) => {
+  let userId = req.id;
+  let user = await UserModel.findById(userId).populate({
+    path: "organizations",
+    select: organizationSendOnly,
+    populate: { path: "members.user", select: userSendOnly },
+  });
+  if (!user) return res.status(404).json({ message: "User doesn't exist" });
+
+  res.json(user.organizations);
+  // user?.organizations.
+  // let organizations = [];
+  // let organizationIds: string[] = req.body.organizations;
+  // for (let orgId of organizationIds) {
+  //   let organization = await OrganizationModel.findById(orgId).populate({
+  //     path: "members.user",
+  //   });
+  //   if (!organization)
+  //     return res.status(404).json({ message: "organization doesn't exist" });
+  //   userId = new mongoose.Types.ObjectId(userId);
+  //   if (
+  //     !organization.members.find((member) => {
+  //       return member.user === org;
+  //     })
+  //   ) {
+  //     return res
+  //       .status(403)
+  //       .json({ message: "You aren't a member of one of the organizations" });
+  //   }
+  //   organizations.push(organization);
+  // }
+  // res.status(200).json(organizations);
 });
 app.post(
   "/",
@@ -48,9 +99,6 @@ app.post(
       members: [{ user: userId, isAdmin: true }],
       ...pass,
     });
-    // user.organizations = user.organizations.filter((org) => {
-    //   return org === organization.id;
-    // });
     user.organizations.push(organization.id);
     try {
       await organization.save();

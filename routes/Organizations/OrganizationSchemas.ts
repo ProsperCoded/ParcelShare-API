@@ -23,3 +23,9 @@ export const validateDeleteOrganization = Joi.object({
   ).required(),
   passCode: Joi.string().required(),
 });
+export const validateSearchOrganization = Joi.object({
+  query: Joi.string().required().min(1),
+});
+export const validatePopulate = Joi.object({
+  organizations: Joi.array().items(JoiObjectId().required()),
+});
