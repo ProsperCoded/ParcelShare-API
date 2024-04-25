@@ -20,10 +20,6 @@ const OrganizationSchema = new mongoose.Schema({
   },
   passCode: {
     type: String,
-    // validator: function (value: string) {
-    //   if ((this as any).restriction === "public") return false;
-    // },
-    // message: "Restriction mode must be private to set a passCode",
     default: "",
   },
 });

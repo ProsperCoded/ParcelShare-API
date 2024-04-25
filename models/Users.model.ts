@@ -40,7 +40,7 @@ const UserSchema = new mongoose.Schema({
     default: [],
   },
   // Request sent to you
-  connectionsRequest: {
+  connectionRequests: {
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Users" }],
     default: [],
   },

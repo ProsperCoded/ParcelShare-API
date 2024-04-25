@@ -11,10 +11,18 @@ import { validate } from "../../utils/utils.ts";
 import {
   validateCreateOrganization,
   validateDeleteOrganization,
+  validateExitOrganization,
   validateJoinOrganization,
+  validateOrganizationExists,
   validateSearchOrganization,
 } from "./OrganizationSchemas.ts";
-const organizationSendOnly = ["members", "name", "categories", "restriction"];
+const organizationSendOnly = [
+  "members",
+  "name",
+  "categories",
+  "restriction",
+  "_id",
+];
 const app = express.Router();
 app.get("/", async (req, res) => {
   let publicOrganizations = await OrganizationModel.find({
@@ -41,16 +49,35 @@ app.post(
     return res.json(publicSearchResults);
   }
 );
+app.post(
+  "/exists",
+  authenticateUser,
+  validate(validateOrganizationExists),
+  async (req, res) => {
+    let organizationExist = await OrganizationModel.findOne({
+      name: req.body.name,
+    });
+    if (organizationExist)
+      return res.status(200).json({ message: "Organization Exists" });
+    res.status(404).json({ message: "Doesn't Exists" });
+  }
+);
 app.get("/populate", authenticateUser, async (req: any, res) => {
   let userId = req.id;
   let user = await UserModel.findById(userId).populate({
     path: "organizations",
-    select: organizationSendOnly,
+    select: [...organizationSendOnly, "owner"],
     populate: { path: "members.user", select: userSendOnly },
   });
   if (!user) return res.status(404).json({ message: "User doesn't exist" });
-
-  res.json(user.organizations);
+  let organizations = (user.organizations as any[]).map((org) => {
+    let toSend = _.pick(org, organizationSendOnly);
+    return {
+      ...toSend,
+      isOwner: user!.id === (org.owner as mongoose.Types.ObjectId).toString(),
+    };
+  });
+  res.json(organizations);
   // user?.organizations.
   // let organizations = [];
   // let organizationIds: string[] = req.body.organizations;
@@ -81,7 +108,7 @@ app.post(
   async (req: any, res) => {
     let userId: any = req.id;
     const user = await UserModel.findById(userId);
-    if (!user) return res.status(404).send("Can't find user account");
+    if (!user) return res.status(401).json({ message: "Not Authenticated" });
     let organizationExist = await OrganizationModel.findOne({
       name: req.body.name,
     });
@@ -90,14 +117,11 @@ app.post(
         message: `Organization with name '${req.body.name}' already exist`,
       });
 
-    let pass = req.body.passCode
-      ? { passCode: await bcrypt.hash(req.body.passCode, SALT) }
-      : {};
     let organization = new OrganizationModel({
       ...req.body,
       owner: userId,
       members: [{ user: userId, isAdmin: true }],
-      ...pass,
+      passCode: await bcrypt.hash(req.body.passCode, SALT),
     });
     user.organizations.push(organization.id);
     try {
@@ -121,26 +145,37 @@ app.put(
   async (req: any, res) => {
     let organizationId: string = req.body.organizationId;
     let userId: string = req.id;
-    const organization = await OrganizationModel.findById(organizationId);
+    let organization;
+    if (organizationId)
+      organization = await OrganizationModel.findById(organizationId);
+    else
+      organization = await OrganizationModel.findOne({ name: req.body.name });
+
     const user = await UserModel.findById(userId);
-    if (!user) return res.status(404).send("Can't find user account");
+    if (!user) return res.status(401).json({ message: "Not Authenticated" });
     if (!organization)
       return res
         .status(404)
         .json({ message: "Can't Find specified Organization" });
     if (organization.restriction === "private") {
       let passCode: string = req.body.passCode;
-      if (organization.passCode !== passCode) {
+      let isValidPass = await bcrypt.compare(passCode, organization.passCode);
+      if (!isValidPass) {
         return res.status(403).json({ message: "Invalid Passcode Provided" });
       }
     }
-    let _userId = new mongoose.Types.ObjectId(userId);
-    if (organization.members.find((e) => e.user === _userId)) {
+
+    if (
+      organization.members.find((e) => {
+        // let id = new mongoose.Types.ObjectId(e.user);
+        return (e.user as mongoose.Types.ObjectId).toString() === userId;
+      })
+    ) {
       return res
         .status(403)
         .json({ message: "You are already a member of this organization" });
     }
-    organization.members.push({ user: _userId, isAdmin: false });
+    organization.members.push({ user: user._id, isAdmin: false });
     user.organizations.push(organization.id);
     try {
       await organization.save();
@@ -153,7 +188,52 @@ app.put(
         error: JSON.stringify(err),
       });
     }
-    res.status(201).json({ message: "Successfully added to organization" });
+    res
+      .status(201)
+      .json({ message: `${organization.name} joined Successfully` });
+  }
+);
+app.put(
+  "/exit",
+  authenticateUser,
+  validate(validateExitOrganization),
+  async (req, res) => {
+    let userId = (req as any).id;
+    let organizationId = req.body.organizationId;
+    let user = await UserModel.findById(userId);
+    let organization = await OrganizationModel.findById(organizationId);
+    if (!user) return res.status(401).json({ message: "Not Authenticated" });
+    if (!organization && organization === null)
+      return res
+        .status(404)
+        .json({ message: "Can't Find specified Organization" });
+    if (
+      user.id === (organization.owner as mongoose.Types.ObjectId).toString()
+    ) {
+      return res
+        .status(400)
+        .json({ message: "can't exit group you created, please terminate" });
+    }
+    try {
+      user.organizations = user.organizations.filter((org) => {
+        return org.toString() !== organization!.id;
+      });
+      organization.members = (organization as any).members.filter(
+        (org: any) => {
+          return (org.user as mongoose.Types.ObjectId).toString() !== user!.id;
+        }
+      );
+      await user.save();
+      await organization.save();
+    } catch (err: any) {
+      let errMsg = "An Error occurred, in exiting organization";
+      debug_organization(errMsg, err);
+      return res.status(500).json({
+        message: errMsg,
+        error: JSON.stringify(err),
+      });
+    }
+    res.json({ message: `Exited ${organization.name} successfully` });
   }
 );
 app.delete(

@@ -9,11 +9,16 @@ import mongoose from "mongoose";
 import { JWT_MAX_AGE, JWT_PRIVATE_KEY, SALT } from "../../utils/config.ts";
 import FileModel from "../../models/files.model.ts";
 import {
+  acceptConnectUserSchema,
   connectUserSchema,
   deleteUserSchema,
+  disconnectUserSchema,
+  fetchProfileUserSchema,
+  fetchProfilesUserSchema,
   updateProfileSchema,
   userLoginSchema,
   userRegisterSchema,
+  validateCancelConnection,
 } from "./UsersJoiSchemas.ts";
 import OrganizationModel from "../../models/organizations.model.ts";
 import { modifyEveryFile } from "../Files/Files.ts";
@@ -22,6 +27,7 @@ const app = express.Router();
 
 // vars
 export const userSendOnly = [
+  "_id",
   "email",
   "rootDirectory",
   "fullName",
@@ -29,18 +35,49 @@ export const userSendOnly = [
   "registrationDate",
   "organizations",
   "connections",
-  "connectionsRequest",
+  "connectionRequests",
   "shareTo",
   "shareFrom",
   "connectRequests",
 ];
-
+export const userProfileSendOnly = [
+  "_id",
+  "fullName",
+  "username",
+  "registrationDate",
+  "connections",
+];
 // Routes
 
 app.get("/", (req, res) => {
   res.send("Welcome User");
 });
-
+// Should be a get request, but due to the need to include a body in the request i learnt i can't use get for that
+app.post(
+  "/fetch-profiles",
+  authenticateUser,
+  validate(fetchProfilesUserSchema),
+  async (req, res) => {
+    let usersId: string[] = req.body.usersId;
+    let users = await UserModel.find({ _id: { $in: usersId } }).select(
+      userProfileSendOnly
+    );
+    debug_user("users profiles", users);
+    res.json(users);
+  }
+);
+// Should be a get request, but due to the need to include a body in the request i learnt i can't use get for that
+app.post(
+  "/fetch-profile",
+  authenticateUser,
+  validate(fetchProfileUserSchema),
+  async (req, res) => {
+    let userId: string = req.body.userId;
+    let user = await UserModel.findById(userId).select(userProfileSendOnly);
+    debug_user("user profiles", user);
+    res.json(user);
+  }
+);
 app.post("/register", validate(userRegisterSchema), async (req, res, next) => {
   const hashedPass = await bcrypt.hash(req.body.password, SALT);
   debug_user("body:", req.body);
@@ -109,12 +146,10 @@ export function authenticateUser(req: any, res: any, next: () => void) {
   next();
 }
 
-app.get("/auto-login", authenticateUser, async (req: any, res, next) => {
+app.get("/sign-in", authenticateUser, async (req: any, res, next) => {
   try {
     const id: string = req.id;
     const user = await UserModel.findById(id);
-    // .populate([{ path: "friends" }, { path: "organizations" }])
-    // .exec();
     if (!user)
       return res
         .status(401)
@@ -184,7 +219,124 @@ app.put(
   }
 );
 app.put(
-  "/connect",
+  "/connections/accept-connect",
+  authenticateUser,
+  validate(acceptConnectUserSchema),
+  async (req, res) => {
+    let userId = (req as any).id;
+    let acceptedConnectId: string = req.body.acceptedConnectId;
+    let user = await UserModel.findById(userId);
+    if (!user) return res.status(401).json({ message: "Not Authenticated" });
+    let acceptedUser = await UserModel.findById(acceptedConnectId);
+    if (!acceptedUser)
+      return res.status(404).json({ message: "Accepted User wasn't found" });
+    if (
+      !user.connectionRequests.find(
+        (req) => req.toString() === acceptedUser!.id
+      )
+    )
+      return res
+        .status(403)
+        .json({ message: "Sorry This isn't a valid request" });
+    if (
+      !acceptedUser.connectRequests.find((req) => req.toString() === user!.id)
+    )
+      return res
+        .status(403)
+        .json({ message: "Sorry This isn't a valid request" });
+    try {
+      user.connections.push(acceptedUser._id);
+      acceptedUser.connections.push(user._id);
+      user.connectionRequests = user.connectionRequests.filter(
+        (req) => req.toString() !== acceptedUser!.id
+      );
+      // _.pullAllBy(acceptedUser.connectRequests, [user._id]);
+      acceptedUser.connectRequests = acceptedUser.connectRequests.filter(
+        (_user) => _user.toString() !== user!.id
+      );
+      await user.save();
+      await acceptedUser.save();
+    } catch (error) {
+      let message = "An error occurred in accepting " + acceptedUser.fullName;
+      debug_user(message, error);
+      return res.status(500).json({ message, error });
+    }
+    return res.status(201).json({});
+  }
+);
+app.put(
+  "/connections/cancel-request",
+  authenticateUser,
+  validate(validateCancelConnection),
+  async (req, res) => {
+    let userId = (req as any).id;
+    let cancelConnectId: string = req.body.cancelConnectId;
+    let user = await UserModel.findById(userId);
+    if (!user) return res.status(401).json({ message: "Not Authenticated" });
+    // The canceled user, user to be canceled from connection requests.
+    let cancelUser = await UserModel.findById(cancelConnectId);
+    if (!cancelUser)
+      return res.status(404).json({ message: "User wasn't found" });
+    if (!user.connectRequests.find((req) => req.toString() === cancelUser!.id))
+      return res
+        .status(403)
+        .json({ message: "Sorry This isn't a valid request" });
+    if (
+      !cancelUser.connectionRequests.find((req) => req.toString() === user!.id)
+    )
+      return res
+        .status(403)
+        .json({ message: "Sorry This isn't a valid request" });
+
+    try {
+      user.connectRequests = user.connectRequests.filter((req) => {
+        return req.toString() !== cancelUser!.id;
+      });
+      cancelUser.connectionRequests = user.connectionRequests.filter((req) => {
+        return req.toString() !== user!.id;
+      });
+
+      await user.save();
+      await cancelUser.save();
+    } catch (error) {
+      let message = "An error occurred in accepting " + cancelUser.fullName;
+      debug_user(message, error);
+      return res.status(500).json({ message, error });
+    }
+    return res.status(201).json({});
+  }
+);
+app.put(
+  "/connections/remove",
+  authenticateUser,
+  validate(disconnectUserSchema),
+  async (req, res) => {
+    let userId = (req as any).id;
+    let connectionId = req.body.connectionId;
+    let user = await UserModel.findById(userId);
+    if (!user) return res.status(401).json({ message: "Not Authenticated" });
+    let connection = await UserModel.findById(connectionId);
+    if (!connection)
+      return res.status(404).json({ message: "Connection wasn't found" });
+    try {
+      user.connections = user.connections.filter((conn) => {
+        return conn.toString() !== connection!.id;
+      });
+      connection.connections = connection.connections.filter((conn) => {
+        return conn.toString() !== user!.id;
+      });
+      await user.save();
+      await connection.save();
+    } catch (error) {
+      let message = `Error Removing ${connection.fullName} from connection`;
+      debug_user(message, error);
+      return res.status(500).json({ message, error });
+    }
+    return res.status(201).json({});
+  }
+);
+app.put(
+  "/connections/connect",
   authenticateUser,
   validate(connectUserSchema),
   async (req: any, res) => {
@@ -202,8 +354,10 @@ app.put(
           "The user you want to connect to wasn't found, please ensure the account isn't deleted",
       });
     try {
-      user.connections.push(new mongoose.Types.ObjectId(connectId));
+      user.connectRequests.push(connectUser._id);
+      connectUser.connectionRequests.push(user._id);
       await user.save();
+      await connectUser.save();
     } catch (error) {
       let message =
         "An Error occurred in the server when trying create connection request with" +
@@ -226,7 +380,7 @@ app.delete(
   async (req: any, res) => {
     const userId = req.id;
     let user = await UserModel.findById(userId);
-    if (!user)
+    if (!user || user === null)
       return res.status(403).json({ message: "You are not authenticated" });
     const authenticated = await bcrypt.compare(
       req.body.password,
@@ -238,15 +392,37 @@ app.delete(
       });
     try {
       let rootDirectory = user.rootDirectory.toString();
+      // delete all files
       await modifyEveryFile(rootDirectory, async (f) => {
         await FileModel.findByIdAndDelete(f._id);
         if (f._type === "file") {
           deleteFile(f.path);
         }
       });
+      // delete all organizations
+
+      // remove user from all organization where he is a member
+      for (let org of user.organizations) {
+        let organization = (await OrganizationModel.findById(org)) as any;
+        if (organization && organization.owner.toString() !== user.id) {
+          organization.members = organization.members.filter((member: any) => {
+            return member.user.toString() !== user!.id;
+          });
+          organization.save();
+        }
+      }
       let ownedOrganizations = await OrganizationModel.deleteMany({
         owner: user._id,
       });
+      // Remove all connections
+      for (let conn of user.connections) {
+        let connection = await UserModel.findById(conn);
+        if (!connection) continue;
+        connection.connections = connection.connections.filter((conn) => {
+          return conn.toString() !== connection!.id;
+        });
+        connection.save();
+      }
       debug_user(ownedOrganizations);
       await UserModel.findByIdAndDelete(user._id);
       return res.json({ message: "Account/User Was Deleted Successfully" });

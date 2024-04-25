@@ -94,10 +94,6 @@ app.use("/users", UserRouter);
 app.use("/files", FilesRouter);
 app.use("/organizations", OrganizationRouter);
 
-// Application Listener
-// app.listen(PORT, () => {
-//   console.log(`listening on PORT http://localhost:${PORT}`);
-// });
 const server = https.createServer(
   {
     key: fs.readFileSync(`./cert/localhost-key.pem`, "utf8"),

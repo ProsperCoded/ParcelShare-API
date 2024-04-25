@@ -19,7 +19,7 @@ export const userRegisterSchema = Joi.object({
   password: Joi.string().max(20).required(),
   username: Joi.string().max(20).min(0),
   organizations: Joi.array().items(
-    JoiObjectId("organizations items must be of type ObjectID").required()
+    JoiObjectId("organizations items must be of type ObjectID")
   ),
 });
 export const userLoginSchema = Joi.object({
@@ -44,4 +44,19 @@ export const connectUserSchema = Joi.object({
 });
 export const deleteUserSchema = Joi.object({
   password: Joi.string().min(5).required(),
+});
+export const fetchProfilesUserSchema = Joi.object({
+  usersId: Joi.array().items(JoiObjectId().required()),
+});
+export const fetchProfileUserSchema = Joi.object({
+  usersId: JoiObjectId().required(),
+});
+export const acceptConnectUserSchema = Joi.object({
+  acceptedConnectId: JoiObjectId().required(),
+});
+export const disconnectUserSchema = Joi.object({
+  connectionId: JoiObjectId().required(),
+});
+export const validateCancelConnection = Joi.object({
+  cancelConnectId: JoiObjectId().required(),
 });
